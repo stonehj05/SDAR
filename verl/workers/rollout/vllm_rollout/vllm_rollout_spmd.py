@@ -67,6 +67,8 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
+# Opt-in: level=2 drops vLLM weights on sleep instead of backing them up to pinned host RAM.
+VLLM_SLEEP_LEVEL = int(os.getenv("VERL_VLLM_SLEEP_LEVEL", "1"))
 
 # TODO
 # 1. support pp in vllm
@@ -207,7 +209,7 @@ class vLLMRollout(BaseRollout):
         )
 
         # Offload vllm model to reduce peak memory usage
-        self.inference_engine.sleep(level=1)
+        self.inference_engine.sleep(level=VLLM_SLEEP_LEVEL)
 
         kwargs = dict(
             n=1,

@@ -16,11 +16,13 @@
 from typing import List
 import re
 
-def alfworld_projection(actions: List[str], action_pools: List[List[str]]):
+def alfworld_projection(actions: List[str], action_pools: List[List[str]], require_think: bool = True):
     """
     An function to process the actions
     actions: the list of actions to be processeed, it is a list of strings.
     action_pools: the list of action pools, each pool is a list of strings.
+    require_think: whether a valid action must also contain <think>...</think>. Disable for models whose
+        chat template pre-fills the think block (e.g. Qwen3 with enable_thinking=False).
     """
 
     valids = [0] * len(actions)
@@ -52,7 +54,7 @@ def alfworld_projection(actions: List[str], action_pools: List[List[str]]):
         # check <think>...</think>
         think_start_idx = original_str.find("<think>")
         think_end_idx = original_str.find("</think>")
-        if think_start_idx == -1 or think_end_idx == -1:
+        if require_think and (think_start_idx == -1 or think_end_idx == -1):
             valids[i] = 0
 
         # check if contains any Chinese characters

@@ -1,0 +1,22 @@
+{
+  "model": "/gpfs/radev/scratch/cohan/hs2352/SDAR/checkpoints/verl_agent_alfworld/grpo_qwen3_1.7b/global_step_140/hf",
+  "splits": [
+    "seen",
+    "unseen"
+  ],
+  "out_dir": "eval_alfworld/results/grpo_qwen3_1.7b_global_step_140",
+  "num_parallel": 16,
+  "max_steps": 50,
+  "history_length": 2,
+  "temperature": 0.4,
+  "top_p": 1.0,
+  "seed": 0,
+  "max_prompt_length": 2048,
+  "max_response_length": 512,
+  "enable_thinking": false,
+  "require_think": false,
+  "gpu_memory_utilization": 0.7,
+  "tensor_parallel_size": 1,
+  "limit": 0,
+  "save_traj": false
+}

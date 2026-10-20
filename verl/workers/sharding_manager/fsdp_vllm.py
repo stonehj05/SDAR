@@ -221,7 +221,9 @@ class FSDPVLLMShardingManager(BaseShardingManager):
         ):
             self.inference_engine.offload_model_weights()
         else:
-            self.inference_engine.sleep(level=1)
+            # level=2 drops vLLM weights instead of backing them up to pinned host RAM; safe because
+            # weights are re-synced from FSDP on every wake-up. Useful on memory-capped nodes.
+            self.inference_engine.sleep(level=int(os.environ.get("VERL_VLLM_SLEEP_LEVEL", "1")))
 
         self.module.train()
 

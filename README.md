@@ -1,3 +1,11 @@
+10/21: We fork the code from SDAR for implementing the baselines for GRPO, OPSD, GRPO+OPSD and evaluating on ALFWorld.
+
+
+The original README for the repository is below.
+
+---
+
+
 <h1 align="center">
 Self-Distilled Agentic Reinforcement Learning
 </h1>

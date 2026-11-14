@@ -48,6 +48,9 @@ class SDARTaskRunner:
             config.actor_rollout_ref.actor.use_sdar_loss = True
             config.actor_rollout_ref.actor.sdar_loss_coef = sdar_cfg.get("sdar_coef", 0.1)
             config.actor_rollout_ref.actor.sdar_gate_beta = sdar_cfg.get("gate_beta", 5.0)
+            # RA-OPSD: per-turn reliability weights on the distillation loss (algorithm.ra_opsd.signal)
+            use_ra_opsd = config.algorithm.get("ra_opsd", {}).get("signal", "none") != "none"
+            config.actor_rollout_ref.actor.use_opsd_weights = use_ra_opsd
 
         local_path = copy_to_local(
             config.actor_rollout_ref.model.path,
@@ -164,9 +167,13 @@ class SDARTaskRunner:
         print(f"[SDAR] sdar_coef: {config.actor_rollout_ref.actor.sdar_loss_coef}")
         print(f"[SDAR] gate_beta: {config.actor_rollout_ref.actor.sdar_gate_beta}")
 
-        from verl.trainer.ppo.skillsd_ray_trainer import SkillSDRayTrainer
+        if use_ra_opsd:
+            from verl.trainer.ppo.ra_opsd_ray_trainer import RAOPSDRayTrainer as trainer_cls
+            print(f"[SDAR] RA-OPSD reliability weighting: {OmegaConf.to_container(config.algorithm.ra_opsd)}")
+        else:
+            from verl.trainer.ppo.skillsd_ray_trainer import SkillSDRayTrainer as trainer_cls
 
-        trainer = SkillSDRayTrainer(
+        trainer = trainer_cls(
             config=config,
             tokenizer=tokenizer,
             processor=processor,

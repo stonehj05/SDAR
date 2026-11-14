@@ -328,6 +328,8 @@ class DataParallelPPOActor(BasePPOActor):
             select_keys.append("ref_log_prob")
         if self.config.get("use_sdl_loss", False) or self.config.get("use_sdar_loss", False):
             select_keys.append("teacher_log_probs")
+        if self.config.get("use_opsd_weights", False):
+            select_keys.append("opsd_weights")
         batch = data.select(batch_keys=select_keys).batch
         has_multi_modal_inputs = "multi_modal_inputs" in data.non_tensor_batch.keys()
 
@@ -451,6 +453,7 @@ class DataParallelPPOActor(BasePPOActor):
                             response_mask=response_mask,
                             gate_beta=self.config.get("sdar_gate_beta", 5.0),
                             loss_agg_mode=loss_agg_mode,
+                            sample_weights=data["opsd_weights"] if self.config.get("use_opsd_weights", False) else None,
                         )
                         sdar_coef = self.config.get("sdar_loss_coef", 0.1)
                         policy_loss = policy_loss + sdar_loss * sdar_coef

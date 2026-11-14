@@ -1,11 +1,11 @@
 #!/bin/bash
 # Small-scale dry run of the ALFWorld baselines on a 2xA40 node.
-# Usage: bash dryrun/run_alfworld_dryrun.sh {grpo|opsd|grpo_opsd} [extra hydra overrides...]
+# Usage: bash dryrun/run_alfworld_dryrun.sh {grpo|opsd|grpo_opsd|ra_entropy|ra_consistency|ra_disagreement} [extra hydra overrides...]
 # Algorithm flags mirror examples/{grpo_trainer/run_alfworld.sh, opsd_trainer/run_alfworld_3b.sh,
 # grpo_opsd_trainer/run_alfworld_3b.sh} with the Qwen3 variants' model + enable_thinking=False;
 # only sizes/resources are shrunk.
 set -x
-METHOD=${1:?"usage: $0 grpo|opsd|grpo_opsd"}
+METHOD=${1:?"usage: $0 grpo|opsd|grpo_opsd|ra_entropy|ra_consistency|ra_disagreement"}
 shift
 
 source /gpfs/radev/scratch/cohan/hs2352/miniforge3/etc/profile.d/conda.sh
@@ -46,6 +46,12 @@ case $METHOD in
     ENTRY=verl.trainer.main_sdar
     ALGO_ARGS=(+algorithm.sdar.sdar_coef=0.01 +algorithm.sdar.gate_beta=0.0
       +algorithm.sdar.skills_dir=skills/alfworld +algorithm.sdar.skill_all=false)
+    ;;
+  ra_entropy|ra_consistency|ra_disagreement)  # GRPO+OPSD with reliability-weighted distillation
+    ENTRY=verl.trainer.main_sdar
+    ALGO_ARGS=(+algorithm.sdar.sdar_coef=0.01 +algorithm.sdar.gate_beta=0.0
+      +algorithm.sdar.skills_dir=skills/alfworld +algorithm.sdar.skill_all=false
+      +algorithm.ra_opsd.signal=${METHOD#ra_} +algorithm.ra_opsd.consistency_samples=${RA_K:-4})
     ;;
   *) echo "unknown method $METHOD"; exit 1 ;;
 esac

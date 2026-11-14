@@ -17,6 +17,7 @@ def compute_sdar_loss(
     response_mask: torch.Tensor,
     gate_beta: float = 5.0,
     loss_agg_mode: str = "token-mean",
+    sample_weights: torch.Tensor = None,
 ) -> tuple[torch.Tensor, dict]:
     """
     Confidence-Gated Teacher Distillation loss.
@@ -34,6 +35,8 @@ def compute_sdar_loss(
         response_mask: (bs, response_length) - mask for valid response tokens.
         gate_beta: temperature for the sigmoid gate. Higher = sharper gating.
         loss_agg_mode: aggregation mode passed to agg_loss.
+        sample_weights: optional (bs,) per-sample (= per-turn) reliability weights w_t that scale the
+            per-token loss (RA-OPSD, see ra_opsd_utils.py). Treated as constants.
 
     Returns:
         sdar_loss: scalar loss.
@@ -48,6 +51,8 @@ def compute_sdar_loss(
     kl_per_token = teacher_log_probs - student_log_probs
 
     gated_kl = gate * kl_per_token
+    if sample_weights is not None:
+        gated_kl = sample_weights.detach().to(gated_kl.dtype).unsqueeze(-1) * gated_kl
 
     loss = agg_loss(loss_mat=gated_kl, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
 

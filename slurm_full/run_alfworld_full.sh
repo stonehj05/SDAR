@@ -1,13 +1,13 @@
 #!/bin/bash
 # Full ALFWorld training for the SDAR baselines, launched by the *.sbatch files in this directory.
-# Usage: bash slurm_full/run_alfworld_full.sh {grpo|opsd|grpo_opsd} [extra hydra overrides...]
+# Usage: bash slurm_full/run_alfworld_full.sh {grpo|opsd|grpo_opsd|ra_entropy|ra_consistency|ra_disagreement} [extra hydra overrides...]
 # Hyperparameters follow examples/{grpo_trainer/run_alfworld_qwen3_1b.sh, opsd_trainer/run_alfworld_qwen3.sh,
 # grpo_opsd_trainer/run_alfworld_qwen3.sh}. Differences: 4 GPUs (Misha nodes have 4) instead of 8,
-# periodic checkpoints so a job hitting the 2-day limit can be resubmitted and auto-resume, and
+# checkpoints every 5 steps so preempted (auto-requeued) or timed-out jobs resume from the latest one, and
 # env.alfworld.require_think=False (Qwen3 with enable_thinking=False never emits <think>, so every action
 # would otherwise count as invalid).
 set -x
-METHOD=${1:?"usage: $0 grpo|opsd|grpo_opsd"}
+METHOD=${1:?"usage: $0 grpo|opsd|grpo_opsd|ra_entropy|ra_consistency|ra_disagreement"}
 shift
 
 source /gpfs/radev/scratch/cohan/hs2352/miniforge3/etc/profile.d/conda.sh
@@ -27,7 +27,9 @@ unset ROCR_VISIBLE_DEVICES
 
 MODEL=${MODEL:-$HF_HOME/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e}
 N_GPUS=${N_GPUS:-4}
-NUM_CPUS=${SLURM_CPUS_PER_TASK:-32}
+# Ray logical CPUs, independent of the Slurm allocation: 256 env workers x 0.1 CPU need ~26 slots, and they
+# are mostly idle, so oversubscribing the 16 allocated cores is fine. (Peak host RAM was ~223G -> --mem=300G.)
+NUM_CPUS=${RAY_NUM_CPUS:-32}
 train_data_size=16
 val_data_size=128
 group_size=8
@@ -53,6 +55,23 @@ case $METHOD in
     EXP=grpo_opsd_qwen3_1.7b_coef0.01_beta0.0_skillallfalse
     ALGO_ARGS=(+algorithm.sdar.sdar_coef=0.01 +algorithm.sdar.gate_beta=0.0
       +algorithm.sdar.skills_dir=skills/alfworld +algorithm.sdar.skill_all=false)
+    ;;
+  ra_entropy|ra_consistency|ra_disagreement)
+    # Reliability-aware OPSD: the RA_BASE baseline (default grpo_opsd) plus per-turn reliability weights
+    # on the distillation loss. RA_ALPHA sets the weight sharpness, RA_K the teacher samples for consistency.
+    SIGNAL=${METHOD#ra_}
+    RA_BASE=${RA_BASE:-grpo_opsd}
+    ENTRY=verl.trainer.main_sdar
+    case $RA_BASE in
+      grpo_opsd) ALGO_ARGS=(+algorithm.sdar.gate_beta=0.0) ;;
+      opsd) ALGO_ARGS=(+actor_rollout_ref.actor.pg_loss_coef=0 +algorithm.sdar.gate_beta=5.0) ;;
+      *) echo "unknown RA_BASE $RA_BASE"; exit 1 ;;
+    esac
+    EXP=ra_${SIGNAL}_${RA_BASE}_qwen3_1.7b_alpha${RA_ALPHA:-1.0}
+    ALGO_ARGS+=(+algorithm.sdar.sdar_coef=0.01
+      +algorithm.sdar.skills_dir=skills/alfworld +algorithm.sdar.skill_all=false
+      +algorithm.ra_opsd.signal=$SIGNAL +algorithm.ra_opsd.alpha=${RA_ALPHA:-1.0}
+      +algorithm.ra_opsd.consistency_samples=${RA_K:-4})
     ;;
   *) echo "unknown method $METHOD"; exit 1 ;;
 esac
@@ -115,7 +134,7 @@ python3 -m $ENTRY \
     trainer.n_gpus_per_node=$N_GPUS \
     trainer.ray_wait_register_center_timeout=600 \
     trainer.nnodes=1 \
-    trainer.save_freq=10 \
+    trainer.save_freq=5 \
     trainer.max_actor_ckpt_to_keep=2 \
     trainer.resume_mode=auto \
     trainer.test_freq=5 \

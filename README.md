@@ -1,5 +1,7 @@
 10/21: We fork the code from SDAR for implementing the baselines for GRPO, OPSD, GRPO+OPSD and evaluating on ALFWorld.
 
+11/26: Cloud TPU (v4) port of the ALFWorld RA-OPSD runs and the ALFWorld eval: see [tpu/README.md](tpu/README.md).
+
 
 The original README for the repository is below.
 
